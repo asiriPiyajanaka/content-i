@@ -1,47 +1,66 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import DOMPurify from 'dompurify'
 import WelcomeItem from './WelcomeItem.vue'
 import DocumentationIcon from './icons/IconDocumentation.vue'
 import ToolingIcon from './icons/IconTooling.vue'
-// import EcosystemIcon from './icons/IconEcosystem.vue';
-// import CommunityIcon from './icons/IconCommunity.vue';
-// import SupportIcon from './icons/IconSupport.vue';
+import EcosystemIcon from './icons/IconEcosystem.vue'
+import CommunityIcon from './icons/IconCommunity.vue'
+import SupportIcon from './icons/IconSupport.vue'
 
-// Mock API to fetch HTML content
-const fetchMockContent = (): Promise<string> => {
+// Map of icons for dynamic rendering
+const iconMap = {
+  DocumentationIcon,
+  ToolingIcon,
+  EcosystemIcon,
+  CommunityIcon,
+  SupportIcon,
+}
+
+// Type for dynamic content
+interface DynamicContentItem {
+  heading: string
+  icon: keyof typeof iconMap
+  content: string // Raw HTML string
+}
+
+// Mock API returning structured data
+const fetchMockContent = (): Promise<DynamicContentItem[]> => {
   return new Promise((resolve) => {
-    console.log('Fetching mock content...')
     setTimeout(() => {
-      resolve(`
-        <WelcomeItem>
-          <template #icon>
-            <EcosystemIcon />
-          </template>
-          <template #heading>Ecosystem</template>
-          Get official tools and libraries for your project:
-          <a href="https://pinia.vuejs.org/" target="_blank" rel="noopener">Pinia</a>,
-          <a href="https://router.vuejs.org/" target="_blank" rel="noopener">Vue Router</a>,
-          <a href="https://test-utils.vuejs.org/" target="_blank" rel="noopener">Vue Test Utils</a>, and
-          <a href="https://github.com/vuejs/devtools" target="_blank" rel="noopener">Vue Dev Tools</a>.
-          If you need more resources, we suggest paying
-          <a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">Awesome Vue</a>
-          a visit.
-        </WelcomeItem>
-      `)
-    }, 1000) // Simulate network delay
+      resolve([
+        {
+          heading: 'Ecosystem',
+          icon: 'EcosystemIcon',
+          content: `
+            Get official tools and libraries for your project:
+            <a href="https://pinia.vuejs.org/" target="_blank" rel="noopener">Pinia</a>,
+            <a href="https://router.vuejs.org/" target="_blank" rel="noopener">Vue Router</a>,
+            <a href="https://test-utils.vuejs.org/" target="_blank" rel="noopener">Vue Test Utils</a>, and
+            <a href="https://github.com/vuejs/devtools" target="_blank" rel="noopener">Vue Dev Tools</a>.
+            If you need more resources, we suggest paying
+            <a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">Awesome Vue</a>
+            a visit.
+          `,
+        },
+      ])
+    }, 2000)
   })
 }
 
-// State to hold the fetched HTML content
-const fetchedContent = ref<string>('')
+// State to hold the fetched and sanitized data
+const dynamicContent = ref<DynamicContentItem[]>([])
 
-// Fetch content on component mount
+// Fetch and sanitize content on component mount
 onMounted(async () => {
   try {
     const content = await fetchMockContent()
-    fetchedContent.value = content
+    dynamicContent.value = content.map((item) => ({
+      ...item,
+      content: DOMPurify.sanitize(item.content), // Sanitize the HTML content to prevent XSS attacks. DOMPurify can configure  to allow specific tags or attributes if needed. See https://github.com/cure53/DOMPurify
+    }))
   } catch (error) {
-    console.error('Error fetching mock content:', error)
+    console.error('Error fetching or sanitizing content:', error)
   }
 })
 </script>
@@ -59,21 +78,20 @@ onMounted(async () => {
       provides you with all information you need to get started.
     </WelcomeItem>
 
-    <WelcomeItem>
-      <template #icon>
-        <ToolingIcon />
-      </template>
-      <template #heading>Tooling</template>
-      This project is served and bundled with
-      <a href="https://vite.dev/guide/features.html" target="_blank" rel="noopener">Vite</a>. The
-      recommended IDE setup is
-      <a href="https://code.visualstudio.com/" target="_blank" rel="noopener">VSCode</a>
-      +
-      <a href="https://github.com/johnsoncodehk/volar" target="_blank" rel="noopener">Volar</a>.
-    </WelcomeItem>
-
-    <!-- Injected Content -->
-    <div v-html="fetchedContent"></div>
+    <!-- Dynamic Content -->
+    <div v-for="(item, index) in dynamicContent" :key="index">
+      <WelcomeItem>
+        <template #icon>
+          <!-- Dynamically resolve and render the icon -->
+          <component :is="iconMap[item.icon]" />
+        </template>
+        <template #heading>
+          {{ item.heading }}
+        </template>
+        <!-- Render the sanitized content as raw HTML. This is where lot of limitations live. More sanitization and research on this needs to be done -->
+        <div v-html="item.content"></div>
+      </WelcomeItem>
+    </div>
   </div>
 </template>
 
